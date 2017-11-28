@@ -1,40 +1,39 @@
 #include "TutorialApplication.h"
-#include <OgreEntity.h>
-#include <OgreCamera.h>
-#include <OgreViewport.h>
-#include <OgreSceneManager.h>
-#include <OgreRenderWindow.h>
-#include <OgreConfigFile.h>
-#include <OgreException.h>
-#include<OgreMesh.h>
-#include<OgreMeshManager.h>
+
 
 using namespace Ogre;
 
 TutorialApplication::TutorialApplication()
 	: mRoot(0),
+	mShutdown(false),
 	mResourcesCfg(Ogre::StringUtil::BLANK),
 	mPluginsCfg(Ogre::StringUtil::BLANK),
+	playermove(250),
 	mWindow(0),
 	mSceneMgr(0),
 	mCamera(0),
 	mInputMgr(0),
 	mMouse(0),
-	mKeyboard(0)
+	mKeyboard(0),
+	mPlayerNode(0),
+	mCameraMan(0),
+	playerDirection(Vector3::ZERO)
 {
 
 }
 
 TutorialApplication::~TutorialApplication()
 {
-	Ogre::WindowEventUtilities::removeWindowEventListener(mWindow, this);
+	if(mCameraMan)
+		delete mCameraMan;
 
+	Ogre::WindowEventUtilities::removeWindowEventListener(mWindow, this);
 	windowClosed(mWindow);
 
 	delete mRoot;
 }
 
-bool TutorialApplication::go()
+void TutorialApplication::go()
 {
 
 #ifdef _DEBUG
@@ -45,8 +44,236 @@ bool TutorialApplication::go()
 	mPluginsCfg = "plugins.cfg";
 #endif
 
+	if (!setup())
+		return;
+
+
+	//if (!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
+		//return false;
+
+	mRoot->startRendering();
+
+	destroyScene();
+
+}
+
+//조작 구현
+bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
+{
+	if (mKeyboard->isKeyDown(OIS::KC_ESCAPE))
+	{
+		mShutdown = true;
+	}
+
+	if(mShutdown)
+	{
+		return false;
+	}
+
+
+	if (mWindow->isClosed()) return false;
+
+	//
+	//mPlayerNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
+
+	mKeyboard->capture();
+	mMouse->capture();
+
+	mPlayerNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
+ 
+	mCameraMan->frameRenderingQueued(fe);
+
+	return true;
+}
+
+
+bool TutorialApplication::keyPressed(const OIS::KeyEvent& ke)
+{
+	//mCameraMan->injectKeyDown(ke);
+	
+	switch (ke.key)
+	{
+	case OIS::KC_W :
+		playerDirection.z = -playermove;
+		break;
+	case OIS::KC_S :
+		playerDirection.z = playermove;
+		break;
+	case OIS::KC_A:
+		playerDirection.x = -playermove;
+		break;
+	case OIS::KC_D:
+		playerDirection.x = playermove;
+		break;
+	default:
+		break;
+	}
+	
+	return true;
+}
+bool TutorialApplication::keyReleased(const OIS::KeyEvent& ke)
+{
+	 //mCameraMan->injectKeyUp(ke);
+
+	switch (ke.key)
+	{
+	case OIS::KC_W :
+		playerDirection.z = 0;
+		break;
+	case OIS::KC_S :
+		playerDirection.z = 0;
+		break;
+	case OIS::KC_A:
+		playerDirection.x = 0;
+		break;
+	case OIS::KC_D:
+		playerDirection.x = 0;
+		break;
+	default:
+		break;
+	}
+	return true;
+}
+
+//세팅
+bool TutorialApplication::setup()
+{
 	mRoot = new Ogre::Root(mPluginsCfg);
 
+	setupResources();
+
+	if (!configure())
+		return false;
+
+	chooseSceneManager();
+	createCamera();
+	//createViewports();
+
+	Ogre::TextureManager::getSingleton().setDefaultNumMipmaps(10);
+
+	createResourceListener();
+	loadResources();
+
+	createScene();
+
+	createFrameListener();
+
+	return true;
+}
+
+
+bool TutorialApplication::configure()
+{
+  if (!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
+  {
+    return false;
+  }
+
+  mWindow = mRoot->initialise(true, "TutorialApplication Render Window");
+
+  return true;
+}
+
+void TutorialApplication::chooseSceneManager()
+{
+	mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC);
+}
+
+
+//카메라 생성
+void TutorialApplication::createCamera()
+{
+	// Set camera position & direction
+	mCamera = mSceneMgr->createCamera("MainCam");
+	mCamera->setPosition(Ogre::Vector3(1500, 1500, 1500));
+	//mCamera->rotate
+	mCamera->lookAt(Ogre::Vector3(0, 0, 0));
+	mCamera->setNearClipDistance(20);
+	Ogre::Viewport* vp = mWindow->addViewport(mCamera);
+	vp->setBackgroundColour(Ogre::ColourValue(0, 0, 0));
+	mCamera->setAspectRatio(Ogre::Real(vp->getActualWidth()) / Ogre::Real(vp->getActualHeight()));
+	mSceneMgr->setAmbientLight(ColourValue(1, 1, 1));
+
+
+	mCameraMan = new OgreBites::SdkCameraMan(mCamera);
+}
+
+
+//개체들 배치
+void TutorialApplication::createScene()
+{
+	//mSceneMgr->setAmbientLight(Ogre::ColourValue(0, 0, 0));
+	mSceneMgr->setShadowTechnique(Ogre::SHADOWTYPE_STENCIL_ADDITIVE);
+
+	//기본적 배치를 위한 라이트
+	Ogre::Light* light = mSceneMgr->createLight("MainLight");
+	light->setPosition(300, 300, -300);
+
+	// Create a plane
+	Ogre::Plane plane(Ogre::Vector3::UNIT_Y, 0);
+	MeshManager::getSingleton().createPlane("plane",
+		ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, plane,
+		3000,3000,200,200,true,1,3,3,Vector3::UNIT_Z);
+	Ogre::Entity* ent = mSceneMgr->createEntity("LightPlaneEntity", "plane");
+	mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(ent);
+	ent->setMaterialName("Examples/BeachStones");
+	Ogre::SceneNode* node = mSceneMgr->createSceneNode("Node1");
+	mSceneMgr->getRootSceneNode()->addChild(node);
+
+	
+	Ogre::Entity* entNinja = mSceneMgr->createEntity("Ninja", "ninja.mesh");
+	entNinja->setCastShadows(true);
+	Ogre::SceneNode* playernode = mSceneMgr->getRootSceneNode()->createChildSceneNode("playernode");
+	playernode->setPosition(0,0,0);
+	playernode->attachObject(entNinja);
+
+	//이러한 접근도 가능함 참고
+	//mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(entNinja);
+	//Ogre::SceneNode* playernode =  mSceneMgr->getRootSceneNode()->createChildSceneNode("PlayerNode", Ogre::Vector3( 0, 0, 0 ));
+	//playernode->attachObject(entNinja);
+
+
+	mPlayerNode = playernode;
+}
+
+void TutorialApplication::destroyScene()
+{
+
+}
+
+void TutorialApplication::createFrameListener()
+{
+	Ogre::LogManager::getSingletonPtr()->logMessage("*** Initializing OIS ***");
+
+	OIS::ParamList pl;
+	size_t windowHnd = 0;
+	std::ostringstream windowHndStr;
+
+	mWindow->getCustomAttribute("WINDOW", &windowHnd);
+	windowHndStr << windowHnd;
+	pl.insert(std::make_pair(std::string("WINDOW"), windowHndStr.str()));
+
+	mInputMgr = OIS::InputManager::createInputSystem(pl);
+
+	mKeyboard = static_cast<OIS::Keyboard*>(
+		mInputMgr->createInputObject(OIS::OISKeyboard, true));
+	mMouse = static_cast<OIS::Mouse*>(
+		mInputMgr->createInputObject(OIS::OISMouse, true));
+
+	mKeyboard->setEventCallback(this);
+	//mMouse->setEventCallback(this);
+
+	windowResized(mWindow);
+
+	Ogre::WindowEventUtilities::addWindowEventListener(mWindow, this);
+
+	mRoot->addFrameListener(this);
+
+	Ogre::LogManager::getSingletonPtr()->logMessage("Finished");
+}
+
+void TutorialApplication::setupResources()
+{
 	Ogre::ConfigFile cf;
 	cf.load(mResourcesCfg);
 
@@ -67,127 +294,18 @@ bool TutorialApplication::go()
 			Ogre::ResourceGroupManager::getSingleton().addResourceLocation(name, locType);
 		}
 	}
-
-
-	if (!(mRoot->restoreConfig() || mRoot->showConfigDialog()))
-		return false;
-
-	//게임 배치
-	mWindow = mRoot->initialise(true, "TutorialApplication Render Window");
-
-	Ogre::TextureManager::getSingleton().setDefaultNumMipmaps(10);
-	Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
-
-	mSceneMgr = mRoot->createSceneManager(Ogre::ST_GENERIC);
-
-	// Set camera position & direction
-	mCamera = mSceneMgr->createCamera("MainCam");
-	mCamera->setPosition(Ogre::Vector3(600, 600, 600));
-	mCamera->lookAt(Ogre::Vector3(0, 0, 0));
-	mCamera->setNearClipDistance(5);
-	Ogre::Viewport* vp = mWindow->addViewport(mCamera);
-	vp->setBackgroundColour(Ogre::ColourValue(0, 0, 0));
-	mCamera->setAspectRatio(Ogre::Real(vp->getActualWidth()) / Ogre::Real(vp->getActualHeight()));
-	mSceneMgr->setAmbientLight(ColourValue(1, 1, 1));
-
-	// Create a plane
-	Ogre::Plane plane(Ogre::Vector3::UNIT_Y, -10);
-	MeshManager::getSingleton().createPlane("plane",
-		ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, plane,
-		1500,1500,200,200,true,1,5,5,Vector3::UNIT_Z);
-	Ogre::Entity* ent = mSceneMgr->createEntity("LightPlaneEntity", "plane");
-	mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(ent);
-	ent->setMaterialName("Examples/BeachStones");
-	Ogre::SceneNode* node = mSceneMgr->createSceneNode("Node1");
-	mSceneMgr->getRootSceneNode()->addChild(node);
-
-	// Create a spot light
-	//Ogre::SceneManager::setShadowTechnique(SHADOWTYPE_STENCIL_ADDITIVE);
-
-	Ogre::Light* light = mSceneMgr->createLight("Light1");
-	light->setType(Ogre::Light::LT_SPOTLIGHT);
-	light->setDirection(Ogre::Vector3(0, -1, 0));
-	light->setDiffuseColour(Ogre::ColourValue(0.0f, 1.0f, 0.0f));
-	light->setSpotlightInnerAngle(Ogre::Degree(5.0f));
-	light->setSpotlightOuterAngle(Ogre::Degree(90.0f));
-	Ogre::SceneNode* node2 = node->createChildSceneNode("node2");
-	node2->setPosition(0, 100, 0);
-	node2->attachObject(light);
-
-	Ogre::Entity* lightEnt = mSceneMgr->createEntity("MyEntity","sphere.mesh");
-	Ogre::SceneNode* node3 = node->createChildSceneNode("node3");
-	node3->setScale(0.1f, 0.1f, 0.1f);
-	node3->setPosition(0,100,0);
-	node3->attachObject(lightEnt); 
-
-	// Create a another spot light
-	Ogre::Light* light2 = mSceneMgr->createLight("Light2");
-	light2->setType(Ogre::Light::LT_SPOTLIGHT);
-	light2->setDirection(Ogre::Vector3(0, -1, 0));
-	light2->setDiffuseColour(Ogre::ColourValue(1.0f, 0.0f, 0.0f));
-	light2->setSpotlightInnerAngle(Ogre::Degree(5.0f));
-	light2->setSpotlightOuterAngle(Ogre::Degree(90.0f));
-	Ogre::SceneNode* node4 = node->createChildSceneNode("node4");
-	node4->setPosition(0, 100, 50);
-	node4->attachObject(light2);
-
-	Ogre::Entity* lightEnt2 = mSceneMgr->createEntity("MyEntity2","sphere.mesh");
-	Ogre::SceneNode* node5 = node->createChildSceneNode("node5");
-	node5->setScale(0.1f, 0.1f, 0.1f);
-	node5->attachObject(lightEnt2);
-	node5->setPosition(0, 100, 50);
-
-	//수정해야함
-	Ogre::Entity* entNinja = mSceneMgr->createEntity("Ninja", "ninja.mesh");
-	mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(entNinja);
-	Ogre::SceneNode* node6 = mSceneMgr->createSceneNode("node6");
-	entNinja->setCastShadows(true);
-	mSceneMgr->getRootSceneNode()->addChild(node6);
-	node6->setPosition(100,0,0);
-	
-	
-	
-	//mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(entNinja);
-
-	// OIS
-	Ogre::LogManager::getSingletonPtr()->logMessage("*** Initializing OIS ***");
-
-	OIS::ParamList pl;
-	size_t windowHandle = 0;
-	std::ostringstream windowHandleStr;
-
-	mWindow->getCustomAttribute("WINDOW", &windowHandle);
-	windowHandleStr << windowHandle;
-	pl.insert(std::make_pair(std::string("WINDOW"), windowHandleStr.str()));
-
-	mInputMgr = OIS::InputManager::createInputSystem(pl);
-
-	mKeyboard = static_cast<OIS::Keyboard*>(
-		mInputMgr->createInputObject(OIS::OISKeyboard, false));
-	mMouse = static_cast<OIS::Mouse*>(
-		mInputMgr->createInputObject(OIS::OISMouse, false));
-
-	windowResized(mWindow);
-	Ogre::WindowEventUtilities::addWindowEventListener(mWindow, this);
-
-	mRoot->addFrameListener(this);
-
-	mRoot->startRendering();
-
-	return true;
 }
 
-bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
+void TutorialApplication::createResourceListener()
 {
-	if (mWindow->isClosed()) return false;
 
-	mKeyboard->capture();
-	mMouse->capture();
-
-	if (mKeyboard->isKeyDown(OIS::KC_ESCAPE)) return false;
-
-	return true;
 }
+
+void TutorialApplication::loadResources()
+{
+	Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
+}
+
 
 void TutorialApplication::windowResized(Ogre::RenderWindow* rw)
 {
@@ -215,6 +333,7 @@ void TutorialApplication::windowClosed(Ogre::RenderWindow* rw)
 		}
 	}
 }
+
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
 #define WIN32_LEAN_AND_MEAN
