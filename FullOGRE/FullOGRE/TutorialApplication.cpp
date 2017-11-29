@@ -86,7 +86,7 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 
 	mPlayerNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
 	mCameraMan->frameRenderingQueued(fe);
-	//mCameraNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
+	mCameraNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
  
 
 
