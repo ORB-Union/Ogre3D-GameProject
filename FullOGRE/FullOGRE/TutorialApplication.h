@@ -25,7 +25,8 @@
 class TutorialApplication
 	: public Ogre::WindowEventListener,
 	public Ogre::FrameListener,
-	public OIS::KeyListener
+	public OIS::KeyListener,
+	public OIS::MouseListener
 	//public OIS::MouseListener
 {
 public:
@@ -49,6 +50,10 @@ private:
 	virtual bool keyPressed(const OIS::KeyEvent& ke);
 	virtual bool keyReleased(const OIS::KeyEvent& ke);
 
+	virtual bool mouseMoved(const OIS::MouseEvent& me);
+	virtual bool mousePressed(const OIS::MouseEvent& me, OIS::MouseButtonID id);
+	virtual bool mouseReleased(const OIS::MouseEvent& me, OIS::MouseButtonID id);
+
 
 	//게임실행 함수들
 	bool setup();
@@ -63,6 +68,7 @@ private:
 	void createResourceListener();
 	void loadResources();
 	void chooseSceneManager();
+	void createViewports();
 
 	bool mShutdown;
 

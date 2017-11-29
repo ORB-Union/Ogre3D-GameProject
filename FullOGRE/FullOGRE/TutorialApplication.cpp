@@ -9,7 +9,7 @@ TutorialApplication::TutorialApplication()
 	mResourcesCfg(Ogre::StringUtil::BLANK),
 	mPluginsCfg(Ogre::StringUtil::BLANK),
 	playermove(250), mWindow(0), mSceneMgr(0), mCamera(0), mInputMgr(0), mMouse(0), mKeyboard(0),
-	mPlayerNode(0), mCameraMan(0), mCameraNode(0), playerrotate(0.2), playerDirection(Vector3::ZERO),
+	mPlayerNode(0), mCameraMan(0), mCameraNode(0), playerrotate(0.5), playerDirection(Vector3::ZERO),
 	mSpotlightNode1(0)
 {
 
@@ -68,13 +68,13 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 
 	if(mKeyboard->isKeyDown(OIS::KC_Q))
 	{
-		mPlayerNode->yaw(Ogre::Degree(playerrotate * 4));
+		mPlayerNode->yaw(Ogre::Degree(playerrotate * 5));
 		//mCameraNode->yaw(Ogre::Degree(playerrotate * 1));
 	}
 
 	if(mKeyboard->isKeyDown(OIS::KC_E))
 	{
-		mPlayerNode->yaw(Ogre::Degree(-playerrotate * 4));
+		mPlayerNode->yaw(Ogre::Degree(-playerrotate * 5));
 		//mCameraNode->yaw(Ogre::Degree(-playerrotate * 1));
 	}
 
@@ -85,10 +85,25 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 	mMouse->capture();
 
 	mPlayerNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
-	mCameraNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
- 
 	mCameraMan->frameRenderingQueued(fe);
+	//mCameraNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
+ 
 
+
+	return true;
+}
+
+bool TutorialApplication::mouseMoved(const OIS::MouseEvent& me)
+{
+	mCameraMan->injectMouseMove(me);
+	return true;
+}
+bool TutorialApplication::mousePressed(const OIS::MouseEvent& me, OIS::MouseButtonID id)
+{
+	return true;
+}
+bool TutorialApplication::mouseReleased(const OIS::MouseEvent& me, OIS::MouseButtonID id)
+{
 	return true;
 }
 
@@ -153,7 +168,7 @@ bool TutorialApplication::setup()
 
 	chooseSceneManager();
 	createCamera();
-	//createViewports();
+	createViewports();
 
 	Ogre::TextureManager::getSingleton().setDefaultNumMipmaps(10);
 
@@ -161,7 +176,6 @@ bool TutorialApplication::setup()
 	loadResources();
 
 	createScene();
-
 	createFrameListener();
 
 	return true;
@@ -202,18 +216,20 @@ void TutorialApplication::createCamera()
 	mCamera->setPosition(Ogre::Vector3(1000, 500, 1000));//현 카메라 좌표는 2000,1000,2000
 	mCamera->lookAt(Ogre::Vector3(playerDirection.x, playerDirection.y, playerDirection.z));
 	mCamera->setNearClipDistance(20);
-	Ogre::Viewport* vp = mWindow->addViewport(mCamera);
-	vp->setBackgroundColour(Ogre::ColourValue(0, 0, 0));
-	mCamera->setAspectRatio(Ogre::Real(vp->getActualWidth()) / Ogre::Real(vp->getActualHeight()));
-	mSceneMgr->setAmbientLight(ColourValue(1, 1, 1)); 
-
+	
 	mCameraMan = new OgreBites::SdkCameraMan(mCamera);
-
-
 
 	//mCameraNode = mPlayerNode;
 	//mPlayerNode->attachObject(mCamera);
 	
+}
+
+void TutorialApplication::createViewports()
+{
+	Ogre::Viewport* vp = mWindow->addViewport(mCamera);
+	vp->setBackgroundColour(Ogre::ColourValue(0, 0, 0));
+	mCamera->setAspectRatio(Ogre::Real(vp->getActualWidth()) / Ogre::Real(vp->getActualHeight()));
+	mSceneMgr->setAmbientLight(ColourValue(1, 1, 1)); 
 }
 
 
@@ -236,7 +252,7 @@ void TutorialApplication::createScene()
 	Ogre::Plane plane(Ogre::Vector3::UNIT_Y, 0);
 	MeshManager::getSingleton().createPlane("plane",
 		ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, plane,
-		3000,3000,200,200,true,1,3,3,Vector3::UNIT_Z);
+		5000,5000,200,200,true,1,3,3,Vector3::UNIT_Z);
 	Ogre::Entity* ent = mSceneMgr->createEntity("LightPlaneEntity", "plane");
 	mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(ent);
 	ent->setMaterialName("Examples/BeachStones");
@@ -253,8 +269,7 @@ void TutorialApplication::createScene()
 	light1->setDirection(Ogre::Vector3(0, -1, 0));
 	light1->setDiffuseColour(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
 	light1->setSpotlightInnerAngle(Ogre::Degree(5.0f));
-	light1->setSpotlightOuterAngle(Ogre::Degree(130.0f));
-
+	light1->setSpotlightOuterAngle(Ogre::Degree(115.0f));
 
 	Ogre::SceneNode* lightnode1 = node->createChildSceneNode("lightnode1");
 	lightnode1->setPosition(600, 250, 600);
@@ -265,7 +280,25 @@ void TutorialApplication::createScene()
 	lightentnode1->setScale(0.1f, 0.1f, 0.1f);
 	lightentnode1->attachObject(lightEnt1);
 
-	
+	ParticleSystem* lightparticle1 =  mSceneMgr->createParticleSystem("LightParticle1", "Space/Sun");
+	SceneNode* lightparticlenode1 = mSceneMgr->getRootSceneNode()->createChildSceneNode("lightparticlenode1");
+	lightparticlenode1->setPosition(600,250,600);
+	lightparticlenode1->attachObject(lightparticle1);
+
+	//왼쪽위 라이트 기둥
+	Ogre::Entity* leftupPillar = mSceneMgr->createEntity("leftupPillar", Ogre::SceneManager::PT_CUBE);
+	leftupPillar->setMaterialName("Examples/checkerwall");
+	lightnode1 = mSceneMgr->getRootSceneNode()->createChildSceneNode("leftupPillarnode", Ogre::Vector3(600,105,600));
+	lightnode1->setScale(0.3f,2.5f,0.3f);
+	lightnode1->attachObject(leftupPillar);
+	leftupPillar->setCastShadows(false);
+
+	/*
+	leftupPillarNode->setPosition(0, 7.5, -100);
+	leftupPillarNode->setScale(4.0f, 0.25f, 0.1f);
+	*/
+
+
 	//중앙
 	//라이트2
 	Ogre::Light* light2 = mSceneMgr->createLight("Light2");
@@ -284,7 +317,20 @@ void TutorialApplication::createScene()
 	lightentnode2->setScale(0.13f, 0.13f, 0.13f);
 	lightentnode2->attachObject(lightEnt2);
 
+	//파티클
+	ParticleSystem* lightparticle2 =  mSceneMgr->createParticleSystem("LightParticle2", "Space/Sun");
+	SceneNode* lightparticlenode2 = mSceneMgr->getRootSceneNode()->createChildSceneNode("lightparticlenode2");
+	lightparticlenode2->setPosition(0,250,0);
+	lightparticlenode2->attachObject(lightparticle2);
 
+	//중앙 기둥
+	Ogre::Entity* MidPillar = mSceneMgr->createEntity("MidPillar", Ogre::SceneManager::PT_CUBE);
+	MidPillar->setMaterialName("Examples/checkerwall");
+	lightnode2 = mSceneMgr->getRootSceneNode()->createChildSceneNode("MidPillarnode", Ogre::Vector3(0,105,0));
+	lightnode2->setScale(0.3f,2.5f,0.3f);
+	lightnode2->attachObject(MidPillar);
+	MidPillar->setCastShadows(false);
+	
 	//오른쪽 아래
 	//라이트3
 	Ogre::Light* light3 = mSceneMgr->createLight("Light3");
@@ -298,10 +344,25 @@ void TutorialApplication::createScene()
 	lightnode3->setPosition(-600, 250, -600);
 	lightnode3->attachObject(light3);
 
+	//파티클
+	ParticleSystem* lightparticle3 =  mSceneMgr->createParticleSystem("LightParticle3", "Space/Sun");
+	SceneNode* lightparticlenode3 = mSceneMgr->getRootSceneNode()->createChildSceneNode("lightparticlenode3");
+	lightparticlenode3->setPosition(-600,250,-600);
+	lightparticlenode3->attachObject(lightparticle3);
+
 	Ogre::Entity* lightEnt3 = mSceneMgr->createEntity("LightEntity3","sphere.mesh");
 	Ogre::SceneNode* lightentnode3 = lightnode3->createChildSceneNode("lightentnode3");
 	lightentnode3->setScale(0.13f, 0.13f, 0.13f);
 	lightentnode3->attachObject(lightEnt3);
+
+
+	//오른쪽 아래 기둥
+	Ogre::Entity* RightDownPillar = mSceneMgr->createEntity("RightDownPillar", Ogre::SceneManager::PT_CUBE);
+	RightDownPillar->setMaterialName("Examples/checkerwall");
+	lightnode3 = mSceneMgr->getRootSceneNode()->createChildSceneNode("RightDownPillarnode", Ogre::Vector3(-600,105,-600));
+	lightnode3->setScale(0.3f,2.5f,0.3f);
+	lightnode3->attachObject(RightDownPillar);
+	RightDownPillar->setCastShadows(false);
 
 
 	
@@ -323,6 +384,20 @@ void TutorialApplication::createScene()
 	lightentnode4->setScale(0.13f, 0.13f, 0.13f);
 	lightentnode4->attachObject(lightEnt4);
 
+	//파티클
+	ParticleSystem* lightparticle4 =  mSceneMgr->createParticleSystem("LightParticle4", "Space/Sun");
+	SceneNode* lightparticlenode4 = mSceneMgr->getRootSceneNode()->createChildSceneNode("lightparticlenode4");
+	lightparticlenode4->setPosition(-600,250,600);
+	lightparticlenode4->attachObject(lightparticle4);
+
+	//왼쪽 아래 기둥
+	Ogre::Entity* LeftDownPillar = mSceneMgr->createEntity("LeftDownPillar", Ogre::SceneManager::PT_CUBE);
+	LeftDownPillar->setMaterialName("Examples/checkerwall");
+	lightnode4 = mSceneMgr->getRootSceneNode()->createChildSceneNode("LeftDownPillarnode", Ogre::Vector3(-600,105,600));
+	lightnode4->setScale(0.3f,2.5f,0.3f);
+	lightnode4->attachObject(LeftDownPillar);
+	LeftDownPillar->setCastShadows(false);
+
 
 	
 	//라이트5
@@ -338,28 +413,57 @@ void TutorialApplication::createScene()
 	lightnode5->setPosition(600, 250, -600);
 	lightnode5->attachObject(light5);
 
+	//파티클
+	ParticleSystem* lightparticle5 =  mSceneMgr->createParticleSystem("LightParticle5", "Space/Sun");
+	SceneNode* lightparticlenode5 = mSceneMgr->getRootSceneNode()->createChildSceneNode("lightparticlenode5");
+	lightparticlenode5->setPosition(600,250,-600);
+	lightparticlenode5->attachObject(lightparticle5);
+
 	Ogre::Entity* lightEnt5 = mSceneMgr->createEntity("LightEntity5","sphere.mesh");
 	Ogre::SceneNode* lightentnode5 = lightnode5->createChildSceneNode("lightentnode5");
 	lightentnode5->setScale(0.13f, 0.13f, 0.13f);
 	lightentnode5->attachObject(lightEnt5);
-	
 
 
-	
-	
+	//오른쪽 위 기둥
+	Ogre::Entity* RightUpPillar = mSceneMgr->createEntity("RightUpPillar", Ogre::SceneManager::PT_CUBE);
+	RightUpPillar->setMaterialName("Examples/checkerwall");
+	lightnode5 = mSceneMgr->getRootSceneNode()->createChildSceneNode("RightUpPillarnode", Ogre::Vector3(600,105,-600));
+	lightnode5->setScale(0.3f,2.5f,0.3f);
+	lightnode5->attachObject(RightUpPillar);
+	RightUpPillar->setCastShadows(false);
 
-	
+
+	//플레이어
 	Ogre::Entity* entNinja = mSceneMgr->createEntity("Ninja", "ninja.mesh");
 	entNinja->setCastShadows(true);
 	Ogre::SceneNode* playernode = mSceneMgr->getRootSceneNode()->createChildSceneNode("playernode");
-	playernode->setPosition(0,0,0);
+	playernode->setPosition(-150,0,150);
 	playernode->attachObject(entNinja);
+
+	//적(예시)
+	Ogre::Entity* entEnemy = mSceneMgr->createEntity("Robot", "robot.mesh");
+	entEnemy->setCastShadows(true);
+	Ogre::SceneNode* enemynode = mSceneMgr->getRootSceneNode()->createChildSceneNode("enemynode");
+	enemynode->setPosition(-800,0,650);
+	enemynode->yaw(Ogre::Degree(20));
+	enemynode->setScale(3.0f,3.0f,3.0f);
+	enemynode->attachObject(entEnemy);
+
+
+
+	Ogre::Entity* entEnemy2 = mSceneMgr->createEntity("Robot2", "robot.mesh");
+	entEnemy2->setCastShadows(true);
+	Ogre::SceneNode* enemynode2 = mSceneMgr->getRootSceneNode()->createChildSceneNode("enemynode2");
+	enemynode2->setPosition(830,0,520);
+	enemynode2->yaw(Ogre::Degree(135));
+	enemynode2->setScale(3.0f,3.0f,3.0f);
+	enemynode2->attachObject(entEnemy2);
 
 	//이러한 접근도 가능함 참고
 	//mSceneMgr->getRootSceneNode()->createChildSceneNode()->attachObject(entNinja);
 	//Ogre::SceneNode* playernode =  mSceneMgr->getRootSceneNode()->createChildSceneNode("PlayerNode", Ogre::Vector3( 0, 0, 0 ));
 	//playernode->attachObject(entNinja);
-
 
 	mPlayerNode = playernode;
 }
@@ -399,6 +503,9 @@ void TutorialApplication::createFrameListener()
 
 	Ogre::LogManager::getSingletonPtr()->logMessage("Finished");
 }
+
+
+
 
 void TutorialApplication::setupResources()
 {
