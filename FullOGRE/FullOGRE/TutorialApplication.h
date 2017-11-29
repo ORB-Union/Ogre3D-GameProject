@@ -77,8 +77,10 @@ private:
 	//개체들
 	Ogre::Vector3 playerDirection; // 플레이어
 	Ogre::SceneNode* mPlayerNode; // 플레이어
+	Ogre::SceneNode* mCameraNode;
 
 	Ogre::Real playermove;
+	Ogre::Real playerrotate;
 
 	Ogre::Real mDistance;
 	Ogre::Real mWalkSpd;
@@ -87,6 +89,9 @@ private:
 	Ogre::AnimationState* mAnimationState;
 	Ogre::Entity* mEntity;
 	Ogre::SceneNode* mNode;
+
+
+	Ogre::SceneNode* mSpotlightNode1;
 
 
 	//Ogre::MeshManager* mMeshMgr;

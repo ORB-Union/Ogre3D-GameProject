@@ -8,16 +8,9 @@ TutorialApplication::TutorialApplication()
 	mShutdown(false),
 	mResourcesCfg(Ogre::StringUtil::BLANK),
 	mPluginsCfg(Ogre::StringUtil::BLANK),
-	playermove(250),
-	mWindow(0),
-	mSceneMgr(0),
-	mCamera(0),
-	mInputMgr(0),
-	mMouse(0),
-	mKeyboard(0),
-	mPlayerNode(0),
-	mCameraMan(0),
-	playerDirection(Vector3::ZERO)
+	playermove(250), mWindow(0), mSceneMgr(0), mCamera(0), mInputMgr(0), mMouse(0), mKeyboard(0),
+	mPlayerNode(0), mCameraMan(0), mCameraNode(0), playerrotate(0.2), playerDirection(Vector3::ZERO),
+	mSpotlightNode1(0)
 {
 
 }
@@ -73,6 +66,18 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 
 	if (mWindow->isClosed()) return false;
 
+	if(mKeyboard->isKeyDown(OIS::KC_Q))
+	{
+		mPlayerNode->yaw(Ogre::Degree(playerrotate * 4));
+		//mCameraNode->yaw(Ogre::Degree(playerrotate * 1));
+	}
+
+	if(mKeyboard->isKeyDown(OIS::KC_E))
+	{
+		mPlayerNode->yaw(Ogre::Degree(-playerrotate * 4));
+		//mCameraNode->yaw(Ogre::Degree(-playerrotate * 1));
+	}
+
 	//
 	//mPlayerNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
 
@@ -80,6 +85,7 @@ bool TutorialApplication::frameRenderingQueued(const Ogre::FrameEvent& fe)
 	mMouse->capture();
 
 	mPlayerNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
+	mCameraNode->translate(playerDirection *fe.timeSinceLastFrame, Ogre::Node::TS_LOCAL);
  
 	mCameraMan->frameRenderingQueued(fe);
 
@@ -183,32 +189,49 @@ void TutorialApplication::chooseSceneManager()
 //카메라 생성
 void TutorialApplication::createCamera()
 {
+	
 	// Set camera position & direction
 	mCamera = mSceneMgr->createCamera("MainCam");
-	mCamera->setPosition(Ogre::Vector3(1500, 1500, 1500));
-	//mCamera->rotate
-	mCamera->lookAt(Ogre::Vector3(0, 0, 0));
+	mPlayerNode = mSceneMgr->getRootSceneNode()->createChildSceneNode("PlayerCamNode", Ogre::Vector3(1000,500,1000));
+	//mPlayerNode = mSceneMgr->getRootSceneNode()->createChildSceneNode("PlayerCamNode", Ogre::Vector3(500,500,1000));
+	mPlayerNode->yaw(Degree(-35));
+	mPlayerNode->pitch(Degree(-20));
+	mCameraNode = mPlayerNode;
+	mPlayerNode->attachObject(mCamera);
+
+	mCamera->setPosition(Ogre::Vector3(1000, 500, 1000));//현 카메라 좌표는 2000,1000,2000
+	mCamera->lookAt(Ogre::Vector3(playerDirection.x, playerDirection.y, playerDirection.z));
 	mCamera->setNearClipDistance(20);
 	Ogre::Viewport* vp = mWindow->addViewport(mCamera);
 	vp->setBackgroundColour(Ogre::ColourValue(0, 0, 0));
 	mCamera->setAspectRatio(Ogre::Real(vp->getActualWidth()) / Ogre::Real(vp->getActualHeight()));
-	mSceneMgr->setAmbientLight(ColourValue(1, 1, 1));
-
+	mSceneMgr->setAmbientLight(ColourValue(1, 1, 1)); 
 
 	mCameraMan = new OgreBites::SdkCameraMan(mCamera);
+
+
+
+	//mCameraNode = mPlayerNode;
+	//mPlayerNode->attachObject(mCamera);
+	
 }
 
 
 //개체들 배치
 void TutorialApplication::createScene()
 {
-	//mSceneMgr->setAmbientLight(Ogre::ColourValue(0, 0, 0));
-	mSceneMgr->setShadowTechnique(Ogre::SHADOWTYPE_STENCIL_ADDITIVE);
+
+	mSceneMgr->setSkyBox(true,"Examples/SpaceSkyBox");
+	//mSceneMgr->setAmbientLight(Ogre::ColourValue(1, 1, 1));
+
+	mSceneMgr->setShadowTechnique(Ogre::SHADOWTYPE_STENCIL_ADDITIVE);	
 
 	//기본적 배치를 위한 라이트
-	Ogre::Light* light = mSceneMgr->createLight("MainLight");
-	light->setPosition(300, 300, -300);
+	//Ogre::Light* light = mSceneMgr->createLight("MainLight");
+	//light->setPosition(300, 300, -300);
 
+
+	//스테이지 배치
 	// Create a plane
 	Ogre::Plane plane(Ogre::Vector3::UNIT_Y, 0);
 	MeshManager::getSingleton().createPlane("plane",
@@ -219,6 +242,111 @@ void TutorialApplication::createScene()
 	ent->setMaterialName("Examples/BeachStones");
 	Ogre::SceneNode* node = mSceneMgr->createSceneNode("Node1");
 	mSceneMgr->getRootSceneNode()->addChild(node);
+	ent->setCastShadows(false);
+
+
+	//맵에 배치할 라이트 생성
+	//왼쪽 위
+	//라이트1
+	Ogre::Light* light1 = mSceneMgr->createLight("Light1");
+	light1->setType(Ogre::Light::LT_SPOTLIGHT);
+	light1->setDirection(Ogre::Vector3(0, -1, 0));
+	light1->setDiffuseColour(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
+	light1->setSpotlightInnerAngle(Ogre::Degree(5.0f));
+	light1->setSpotlightOuterAngle(Ogre::Degree(130.0f));
+
+
+	Ogre::SceneNode* lightnode1 = node->createChildSceneNode("lightnode1");
+	lightnode1->setPosition(600, 250, 600);
+	lightnode1->attachObject(light1);
+
+	Ogre::Entity* lightEnt1 = mSceneMgr->createEntity("LightEntity1","sphere.mesh");
+	Ogre::SceneNode* lightentnode1 = lightnode1->createChildSceneNode("lightentnode1");
+	lightentnode1->setScale(0.1f, 0.1f, 0.1f);
+	lightentnode1->attachObject(lightEnt1);
+
+	
+	//중앙
+	//라이트2
+	Ogre::Light* light2 = mSceneMgr->createLight("Light2");
+	light2->setType(Ogre::Light::LT_SPOTLIGHT);
+	light2->setDirection(Ogre::Vector3(0, -1, 0));
+	light2->setDiffuseColour(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
+	light2->setSpotlightInnerAngle(Ogre::Degree(4.5f));
+	light2->setSpotlightOuterAngle(Ogre::Degree(130.0f));
+
+	Ogre::SceneNode* lightnode2 = node->createChildSceneNode("lightnode2");
+	lightnode2->setPosition(0, 250, 0);
+	lightnode2->attachObject(light2);
+
+	Ogre::Entity* lightEnt2 = mSceneMgr->createEntity("LightEntity2","sphere.mesh");
+	Ogre::SceneNode* lightentnode2 = lightnode2->createChildSceneNode("lightentnode2");
+	lightentnode2->setScale(0.13f, 0.13f, 0.13f);
+	lightentnode2->attachObject(lightEnt2);
+
+
+	//오른쪽 아래
+	//라이트3
+	Ogre::Light* light3 = mSceneMgr->createLight("Light3");
+	light3->setType(Ogre::Light::LT_SPOTLIGHT);
+	light3->setDirection(Ogre::Vector3(0, -1, 0));
+	light3->setDiffuseColour(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
+	light3->setSpotlightInnerAngle(Ogre::Degree(4.5f));
+	light3->setSpotlightOuterAngle(Ogre::Degree(130.0f));
+
+	Ogre::SceneNode* lightnode3 = node->createChildSceneNode("lightnode3");
+	lightnode3->setPosition(-600, 250, -600);
+	lightnode3->attachObject(light3);
+
+	Ogre::Entity* lightEnt3 = mSceneMgr->createEntity("LightEntity3","sphere.mesh");
+	Ogre::SceneNode* lightentnode3 = lightnode3->createChildSceneNode("lightentnode3");
+	lightentnode3->setScale(0.13f, 0.13f, 0.13f);
+	lightentnode3->attachObject(lightEnt3);
+
+
+	
+	//왼쪽 아래
+	//라이트4
+	Ogre::Light* light4 = mSceneMgr->createLight("Light4");
+	light4->setType(Ogre::Light::LT_SPOTLIGHT);
+	light4->setDirection(Ogre::Vector3(0, -1, 0));
+	light4->setDiffuseColour(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
+	light4->setSpotlightInnerAngle(Ogre::Degree(4.5f));
+	light4->setSpotlightOuterAngle(Ogre::Degree(130.0f));
+
+	Ogre::SceneNode* lightnode4 = node->createChildSceneNode("lightnode4");
+	lightnode4->setPosition(-600, 250, 600);
+	lightnode4->attachObject(light4);
+
+	Ogre::Entity* lightEnt4 = mSceneMgr->createEntity("LightEntity4","sphere.mesh");
+	Ogre::SceneNode* lightentnode4 = lightnode4->createChildSceneNode("lightentnode4");
+	lightentnode4->setScale(0.13f, 0.13f, 0.13f);
+	lightentnode4->attachObject(lightEnt4);
+
+
+	
+	//라이트5
+	//오른쪽 위
+	Ogre::Light* light5 = mSceneMgr->createLight("Light5");
+	light5->setType(Ogre::Light::LT_SPOTLIGHT);
+	light5->setDirection(Ogre::Vector3(0, -1, 0));
+	light5->setDiffuseColour(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
+	light5->setSpotlightInnerAngle(Ogre::Degree(4.5f));
+	light5->setSpotlightOuterAngle(Ogre::Degree(130.0f));
+
+	Ogre::SceneNode* lightnode5 = node->createChildSceneNode("lightnode5");
+	lightnode5->setPosition(600, 250, -600);
+	lightnode5->attachObject(light5);
+
+	Ogre::Entity* lightEnt5 = mSceneMgr->createEntity("LightEntity5","sphere.mesh");
+	Ogre::SceneNode* lightentnode5 = lightnode5->createChildSceneNode("lightentnode5");
+	lightentnode5->setScale(0.13f, 0.13f, 0.13f);
+	lightentnode5->attachObject(lightEnt5);
+	
+
+
+	
+	
 
 	
 	Ogre::Entity* entNinja = mSceneMgr->createEntity("Ninja", "ninja.mesh");
