@@ -1,0 +1,44 @@
+material "Housekolodec_01"
+{
+	technique Housekolodec_01_technique
+	{
+		pass Housekolodec_01_standard
+		{
+			ambient 1 1 1 1
+			diffuse 1 1 1 1
+			specular 0 0 0 0 25.5
+			emissive 0 0 0 1
+			vertex_program_ref HousevsLightGEN0
+			{
+			}
+			fragment_program_ref HousefpLightGENDIFF0
+			{
+			}
+
+			texture_unit Housekolodec_01_Diffuse#0
+			{
+				texture Housewell_texture.jpg
+				tex_coord_set 0
+				colour_op modulate
+			}
+		}
+	}
+	technique Housekolodec_01_basic_technique
+	{
+	scheme basic_mat
+		pass Housekolodec_01_standard
+		{
+			ambient 1 1 1 1
+			diffuse 1 1 1 1
+			specular 0 0 0 0 25.5
+			emissive 0 0 0 1
+
+			texture_unit Housekolodec_01_Diffuse#1
+			{
+				texture Housewell_texture.jpg
+				tex_coord_set 0
+				colour_op modulate
+			}
+		}
+	}
+}

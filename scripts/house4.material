@@ -1,0 +1,46 @@
+material "HouseLPBX12"
+{
+	technique HouseLPBX12_technique
+	{
+		pass HouseLPBX12_standard
+		{
+			shading phong
+			ambient 1 1 1 1
+			diffuse 1 1 1 1
+			specular 0 0 0 0.71 127.5
+			emissive 0 0 0 1
+			vertex_program_ref HousevsLightGEN0
+			{
+			}
+			fragment_program_ref HousefpLightGENDIFF0
+			{
+			}
+
+			texture_unit HouseLPBX12_Diffuse#0
+			{
+				texture HouseLPBuildX12.jpg
+				tex_coord_set 0
+				colour_op modulate
+			}
+		}
+	}
+	technique HouseLPBX12_basic_technique
+	{
+	scheme basic_mat
+		pass HouseLPBX12_standard
+		{
+			shading phong
+			ambient 1 1 1 1
+			diffuse 1 1 1 1
+			specular 0 0 0 0.71 127.5
+			emissive 0 0 0 1
+
+			texture_unit HouseLPBX12_Diffuse#1
+			{
+				texture HouseLPBuildX12.jpg
+				tex_coord_set 0
+				colour_op modulate
+			}
+		}
+	}
+}
